@@ -122,6 +122,17 @@ const main = async () => {
     quoteParams.append(key, value);
   }
 
+  //task 2 : Monetize your app with affiliate fees and surplus collection
+  const feeAndSurplusParams = new URLSearchParams({
+    swapFeeRecipient: '0x450b61AA6cb736F2BaACbb20BC8E6d1f18999fA0', // Wallet address that should receive the affiliate fees
+    swapFeeBps: '50',                       // Percentage of buyAmount that should be attributed as affiliate fees
+    swapFeeToken: weth.address, // Receive trading fee in sellToken (weth)
+    tradeSurplusRecipient: '0x450b61AA6cb736F2BaACbb20BC8E6d1f18999fA0'
+  })
+  for (const [key, value] of feeAndSurplusParams.entries()) {
+    quoteParams.append(key, value);
+  }
+
   const quoteResponse = await fetch(
     "https://api.0x.org/swap/permit2/quote?" + quoteParams.toString(),
     {
@@ -132,6 +143,54 @@ const main = async () => {
   const quote = await quoteResponse.json();
   console.log("Fetching quote to swap 1000 WETH for wstETH");
   console.log("quoteResponse: ", quote);
+
+  // task 1. Display the percentage breakdown of liquidity sources
+  if(quote.route){
+    const fills = quote.route.fills;
+    if(!fills || fills.length === 0){
+      console.log("No liquidity sources found for this swap.");
+    }
+    else {
+      console.log(`${fills.length} Sources`);
+
+      fills.forEach((fill:any) => {
+        const source = fill.source;
+        const proportionBps = fill.proportionBps;
+        const proportionPercentage = (proportionBps / 100).toFixed(2); // Convert bps to percentage
+
+        console.log(`${source}: ${proportionPercentage}%`);
+      });
+    }
+  }else {
+    console.log("No route data available in the quote response.");
+  }
+
+  //task 3. Display buy/sell tax for tokens with tax
+  if(quote.tokenMetadata?.buyToken?.buyTaxBps){
+    const buyTax = (quote.tokenMetadata.buyToken.buyTaxBps / 100).toFixed(2); // Convert bps to percentage
+    console.log(`Buy Token Buy Tax: ${buyTax}%`)
+  }else{
+    console.log("No Metadata available in the quote response.")
+  }
+  
+  //task 4. Display all sources of liquidity on Scroll
+  const sourcesResponse = await fetch(
+    "https://api.0x.org/sources",
+    {
+      headers,
+    }
+  );
+
+  const sources = await sourcesResponse.json();
+  console.log("Fetching liquidity sources on scroll chain");
+  console.log("sourcesResponse: ", sources);
+
+  if(sources?.sources){
+    console.log("Liquidity sources for Scroll chain:");
+    sources.sources.forEach((source: string, index: any) =>{
+      console.log(`   ${source}${index !== sources.sources.length-1?',':''}`);
+    })
+  }
 
   // 4. sign permit2.eip712 returned from quote
   let signature: Hex | undefined;
